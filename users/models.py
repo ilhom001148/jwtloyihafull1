@@ -6,6 +6,11 @@ from datetime import datetime,timedelta
 from config.settings import EMAIL_EXPIRATION_TIME,PHONE_EXPIRATION_TIME
 import uuid
 import random
+from rest_framework_simplejwt.tokens import RefreshToken
+import string
+import secrets
+
+
 
 
 ORDINARY_USER,ADMIN,MANAGER=('ordinary_user','admin','manager')
@@ -68,16 +73,48 @@ class CustomUser(AbstractUser,BaseModel):
             self.email = self.email.lower().strip()
 
 
+    def token(self):
+        refresh_token=RefreshToken.for_user(self)
+
+        data={
+            'refresh':str(refresh_token),
+            'access':str(refresh_token.access_token)
+        }
+        return data
+
+
+    def generate_code(self,verify_type):
+        a = string.digits + string.ascii_letters
+        code = ''.join(secrets.choice(a) for _ in range(6))
+        CodeVerify.objects.create(
+            code=code,
+            user=self,
+            verify_type=verify_type
+        )
+        return code
+
+
+
+    # def generate_code(self,verify_type):
+    #     code=random.randint(1000,9999)
+    #     return code
+
+
+
+
     def clean(self):
         self.check_email()
         self.check_username()
         self.check_pass()
         self.hashing_pass()
-        return super().clean()
+
 
     def save(self,*args,**kwargs):
         self.clean()
-        return super().save(*args,**kwargs)
+        super().save(*args,**kwargs)
+
+
+
 
 
 
