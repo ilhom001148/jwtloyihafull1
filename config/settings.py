@@ -12,7 +12,9 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
-from django.conf.global_settings import MEDIA_URL, MEDIA_ROOT
+from unittest.mock import DEFAULT
+
+from django.conf.global_settings import MEDIA_URL, MEDIA_ROOT, AUTH_USER_MODEL
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -33,6 +35,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -142,3 +145,17 @@ MEDIA_ROOT='media'
 
 EMAIL_EXPIRATION_TIME=3
 PHONE_EXPIRATION_TIME=2
+
+
+
+REST_FRAMEWORK={
+    'DEFAULT_AUTHENTICATION_CLASSES':[
+        'rest_framework_simplejwt.authentication.JWTAuthentication'
+    ],
+    'DEFAULT_PERMISSION_CLASSES':[
+        'rest_framework.permissions.IsAuthenticated',
+    ]
+}
+
+
+AUTH_USER_MODEL='users.CustomUser'

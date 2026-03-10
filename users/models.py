@@ -9,8 +9,7 @@ import random
 from rest_framework_simplejwt.tokens import RefreshToken
 import string
 import secrets
-
-
+from django.utils import timezone
 
 
 ORDINARY_USER,ADMIN,MANAGER=('ordinary_user','admin','manager')
@@ -43,7 +42,7 @@ class CustomUser(AbstractUser,BaseModel):
     auth_type=models.CharField(max_length=20,choices=USER_AUTH_TYPE)
     email=models.EmailField(max_length=50,null=True,blank=True,unique=True)
     phone=models.CharField(max_length=13,null=True,blank=True,unique=True)
-    photo=models.ImageField(upload_to='user_photo/',validators=[FileExtensionValidator(allowed_extensions=['png','jpg','heic'])])
+    photo=models.ImageField(upload_to='user_photos/',validators=[FileExtensionValidator(allowed_extensions=['png','jpg','heic'])],null=True,blank=True)
 
     def __str__(self):
         return self.username
@@ -52,8 +51,10 @@ class CustomUser(AbstractUser,BaseModel):
     def check_username(self):
         if not self.username:
             temp_username= f"username{uuid.uuid4().__str__().split('-')[-1]}"
-            while CustomUser.objects.filter(username=temp_username).exists():
-                temp_username+=str(random.randint(0,9))
+            user=CustomUser.objects.filter(username=temp_username).first()
+            if user:
+                while user.exists():
+                    temp_username+=str(random.randint(0,9))
             self.username=temp_username
 
 
@@ -61,10 +62,10 @@ class CustomUser(AbstractUser,BaseModel):
     def check_pass(self):
         if not self.password:
             temp_password=f"username{uuid.uuid4().__str__().split('-')[-1]}"
-            self.username=temp_password
+            self.password=temp_password
 
     def hashing_pass(self):
-        if self.password.startswith('pbkdf2_sha256'):
+        if not self.password.startswith('pbkdf2_sha256'):
             self.set_password(self.password)
 
 
@@ -126,16 +127,16 @@ class CodeVerify(BaseModel):
     )
 
     user=models.ForeignKey(CustomUser,on_delete=models.CASCADE)
-    code=models.CharField(max_length=4)
-    verify_code=models.CharField(max_length=30,choices=VERIFY_TYPE)
+    code=models.CharField(max_length=6)
+    verify_type=models.CharField(max_length=30,choices=VERIFY_TYPE)
     expiration_time=models.DateTimeField()
 
 
     def save(self,*args,**kwargs):
         if self.verify_type==VIA_EMAIL:
-            self.expiration_time=datetime.now()+timedelta(minutes=EMAIL_EXPIRATION_TIME)
+            self.expiration_time=timezone.now()+timedelta(minutes=EMAIL_EXPIRATION_TIME)
         else:
-            self.expiration_time=datetime.now()+timedelta(minutes=PHONE_EXPIRATION_TIME)
+            self.expiration_time=timezone.now()+timedelta(minutes=PHONE_EXPIRATION_TIME)
         return super().save(*args,**kwargs)
 
     def __str__(self):
