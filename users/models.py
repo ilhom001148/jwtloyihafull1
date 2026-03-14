@@ -126,10 +126,11 @@ class CodeVerify(BaseModel):
         (VIA_PHONE, VIA_PHONE)
     )
 
-    user=models.ForeignKey(CustomUser,on_delete=models.CASCADE)
+    user=models.ForeignKey(CustomUser,on_delete=models.CASCADE,related_name='verify_codes')
     code=models.CharField(max_length=6)
     verify_type=models.CharField(max_length=30,choices=VERIFY_TYPE)
     expiration_time=models.DateTimeField()
+    is_active = models.BooleanField(default=False)
 
 
     def save(self,*args,**kwargs):
