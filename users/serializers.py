@@ -229,53 +229,62 @@ class LoginSerializer(TokenObtainPairSerializer):
             raise ValidationError({"message":'xato malumot kiritdingiz','status':status.HTTP_400_BAD_REQUEST})
         return True
 
-
-class ForgotPassword(serializers.Serializer):
+class ForgotPasswordSerializers(serializers.Serializer):
     user_input=serializers.CharField(required=True,write_only=True)
 
     def validate(self, attrs):
         user_data=attrs.get('user_input',None)
         if not user_data:
-            raise ValidationError('Email,telefon raqam yoki username kiriting')
-
-        user_data_type=check_email_or_phone_or_username(user_data)
-        user=CustomUser.objects.filter(Q(username=user_data) | Q(email=user_data) | Q(phone_number=user_data))
+            raise ValidationError({'message':'email,username yoki telefon raqam kiriting'})
+        user=CustomUser.objects.filter(
+            Q(username=user_data) | Q(email=user_data) | Q(phone_number=user_data)).first()
         if not user:
-            raise ValidationError('Email,telefon raqam yoki username xato kiritilgan')
-        if user and user_data_type=='username':
-            if user.email:
-                code=user.generate_code()
-                print("EMAIL_CODE::::::::::")
-            elif user.phone_number:
-                code=user.generate_code()
-                print('PHONE_CODE:::::::::::')
+            raise ValidationError(detail="xato malumot kiritdingiz yoki ro'yxatdan o'tmagansiz")
+        user_type=check_email_or_phone_or_username(user_data)
+
+        if user_type=='phone':
+            code = user.generate_code(VIA_PHONE)
+            print(code, 'ppppppppppppppppppppppp')
+        elif user_type=='email':
+            code=send_email(user)
+        elif user_type=='username':
+            if user.phone_number:
+                code = user.generate_code(VIA_PHONE)
+                print(code, 'ppppppppppppppppppppppp')
+            elif user.email:
+                code = send_email(user)
             else:
-                print('Siz toliq royxatdan otmagansiz')
-        elif user and user_data_type=='email':
-            code=user.generate_code()
-            print('EMAIL_CODE:::::::::')
-        elif user and user_data_type=="phone":
-            code=user.generate_code()
-            print("PHONE_CODE:::::::::")
-        response_data={
+                raise ValidationError(detail="siz to'liq ro'yxatdan o'tmagansiz ")
+
+        response={
             'status':status.HTTP_201_CREATED,
-            'message':'kod yuborildi'
+            'message':'Kodingiz yuborildi',
+            'refresh':user.token()['refresh'],
+            'access':user.token()['access']
         }
-        return response_data
-
-
-class ResetPassword():
-    pass
+        return response
 
 
 
+class ResetPasswordSerializers(serializers.Serializer):
+    password=serializers.CharField(required=True,write_only=True)
+    conf_password=serializers.CharField(required=True,write_only=True)
 
+    def validate(self, attrs):
+        password=attrs.get('password')
+        conf_password=attrs.get('conf_password')
+        if  password!=conf_password:
+            raise ValidationError({'message':'parollar mos emas'})
+        elif len(password)<7:
+            raise ValidationError({'message':'parol 8 ta belgidan kam bolmasligi kerak'})
+        return attrs
 
-
-
-
-
-
+    def update(self, instance, validated_data):
+        validated_data.pop('conf_password')
+        password=validated_data.get('password')
+        instance.set_password(password)
+        instance.save()
+        return instance
 
 
 
