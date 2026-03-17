@@ -1,3 +1,5 @@
+from http.client import responses
+
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from .models import CustomUser, VIA_EMAIL, VIA_PHONE, CodeVerify,CODE_VERIFY,DONE,PHOTO_DONE
@@ -171,30 +173,36 @@ class LoginSerializer(TokenObtainPairSerializer):
     password=serializers.CharField(required=True,write_only=True)
 
     def __init__(self,*args,**kwargs):
-        super(LoginSerializer).__init__(*args,**kwargs)
+        super().__init__(*args,**kwargs)
         self.fields['user_input']=serializers.CharField(required=True,write_only=True)
         self.fields['username']=serializers.CharField(read_only=True)
 
 
     def validate(self,attrs):
-        data=self.check_user_type(attrs)
-        return data
+        user=self.check_user_type(attrs)
+        response_data={
+            'status':status.HTTP_200_OK,
+            'message':'siz tizimga kirdingiz',
+            'access':user.token()['access'],
+            'refresh':user.token()['refresh']
+        }
+        return response_data
 
 
-    def check_user_type(data):
+    def check_user_type(self,data):
         password=data.get('password')
         user_input_data=data.get('user_input')
         user_type=check_email_or_phone_or_username(data.get(user_input_data))
         if user_type=='username':
-            user=CustomUser.objects.filter(username=user_input_data)
+            user=CustomUser.objects.filter(username=user_input_data).first()
             self.get_object(user)
             username=user_input_data
         elif user_type=="email":
-            user=CustomUser.objects.filter(email__icontains=user_input_data.lower())
+            user=CustomUser.objects.filter(email__icontains=user_input_data.lower()).first()
             self.get_object(user)
             username=user.username
         elif user_type=="phone":
-            user=CustomUser.objects.filter(phone_number=user_input_data)
+            user=CustomUser.objects.filter(phone_number=user_input_data).first()
             self.get_object(user)
             username=user.username
         else:
@@ -204,20 +212,71 @@ class LoginSerializer(TokenObtainPairSerializer):
             "password": password,
             self.username_field: username
         }
+
         if user.auth_status not in [DONE,PHOTO_DONE]:
             raise ValidationError(detail="siz hali toliq royxatdan otmagansiz")
 
         user=authenticate(**authentication_kwargs)
 
         if not user:
-            raise ValidationError('login yoki parol xato')
+            raise ValidationError('parol xato')
         return user
 
 
 
-    def get_object(self,user_input):
-        # user=CustomUser.objects.filter(Q(username=user_input) | Q(email=user_input) | Q(phone_number=user_input))
+    def get_object(self,user):
         if not user:
             raise ValidationError({"message":'xato malumot kiritdingiz','status':status.HTTP_400_BAD_REQUEST})
         return True
+
+
+class ForgotPassword(serializers.Serializer):
+    user_input=serializers.CharField(required=True,write_only=True)
+
+    def validate(self, attrs):
+        user_data=attrs.get('user_input',None)
+        if not user_data:
+            raise ValidationError('Email,telefon raqam yoki username kiriting')
+
+        user_data_type=check_email_or_phone_or_username(user_data)
+        user=CustomUser.objects.filter(Q(username=user_data) | Q(email=user_data) | Q(phone_number=user_data))
+        if not user:
+            raise ValidationError('Email,telefon raqam yoki username xato kiritilgan')
+        if user and user_data_type=='username':
+            if user.email:
+                code=user.generate_code()
+                print("EMAIL_CODE::::::::::")
+            elif user.phone_number:
+                code=user.generate_code()
+                print('PHONE_CODE:::::::::::')
+            else:
+                print('Siz toliq royxatdan otmagansiz')
+        elif user and user_data_type=='email':
+            code=user.generate_code()
+            print('EMAIL_CODE:::::::::')
+        elif user and user_data_type=="phone":
+            code=user.generate_code()
+            print("PHONE_CODE:::::::::")
+        response_data={
+            'status':status.HTTP_201_CREATED,
+            'message':'kod yuborildi'
+        }
+        return response_data
+
+
+class ResetPassword():
+    pass
+
+
+
+
+
+
+
+
+
+
+
+
+
 

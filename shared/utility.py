@@ -37,7 +37,7 @@ def check_email_or_phone_or_username(user_input):
     else:
         response={
             'status':status.HTTP_400_BAD_REQUEST,
-            'message':'Email yoki Telefon nomeringiz notogri kiritilgan'
+            'message':'Login  notogri kiritilgan'
         }
         raise ValidationError(response)
     return data

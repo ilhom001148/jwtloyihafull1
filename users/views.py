@@ -1,6 +1,10 @@
+from http.client import responses
+
 from django.shortcuts import render,get_object_or_404
 from rest_framework.generics import CreateAPIView
 from rest_framework import permissions,status
+from rest_framework.permissions import IsAuthenticated
+
 from .serializers import SignUpSerializer,UserChangeInfoSerializer,UserPhotoStatusSerializer,LoginSerializer
 from .models import CustomUser,NEW,CODE_VERIFY,DONE,PHOTO_DONE,VIA_EMAIL,VIA_PHONE
 from rest_framework.views import APIView
@@ -11,6 +15,7 @@ from django.utils import timezone
 from .models import CodeVerify,CustomUser
 from rest_framework.authtoken.models import Token
 from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.tokens import RefreshToken
 
 
 
@@ -128,6 +133,48 @@ class UserPhotoStatusView(APIView):
 
 class LoginView(TokenObtainPairView):
     serializer_class = LoginSerializer
+
+
+
+class LogoutView(APIView):
+    def post(self,request):
+        try:
+            refresh_token=RefreshToken(refresh)
+            refresh_token.blacklist()
+        except Exception as e:
+            raise ValidationError(detail='xatolik: {e)')
+
+        else:
+            response_data={
+                'status':status.HTTP_200_OK,
+                'message':'tizimdan chiqdingiz'
+            }
+            return Response(response_data)
+
+
+
+class LoginRefreshView(APIView):
+    permission_classes = (permissions.AllowAny,)
+    def get(self,request):
+        refresh=self.request.data.get('refresh',None)
+        try:
+            refresh_token=RefreshToken(refresh)
+        except Exception as e:
+            raise ValidationError(detail=f'Xatolik: {e}')
+
+        else:
+            response_data={
+                'status':status.HTTP_201_CREATED,
+                'access':str(refresh_token.access_token)
+            }
+            return Response(response_data)
+
+
+
+
+
+
+
 
 
 
