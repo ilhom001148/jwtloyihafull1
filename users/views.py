@@ -1,12 +1,12 @@
-from http.client import responses
-
 from django.shortcuts import render,get_object_or_404
-from rest_framework.generics import CreateAPIView
+from django.template.defaulttags import comment
+from rest_framework.generics import (CreateAPIView,UpdateAPIView,ListAPIView,RetrieveAPIView,DestroyAPIView,get_object_or_404)
 from rest_framework import permissions,status
-from rest_framework.permissions import IsAuthenticated
-
-from .serializers import SignUpSerializer,UserChangeInfoSerializer,UserPhotoStatusSerializer,LoginSerializer
-from .models import CustomUser,NEW,CODE_VERIFY,DONE,PHOTO_DONE,VIA_EMAIL,VIA_PHONE
+from rest_framework.permissions import IsAuthenticated,AllowAny
+from .models import Post
+from .serializers import SignUpSerializer, UserChangeInfoSerializer, UserPhotoStatusSerializer, LoginSerializer, \
+    PostSerializers, PostDetailSerializers, CommentSerializer
+from .models import CustomUser, NEW, CODE_VERIFY, DONE, PHOTO_DONE, VIA_EMAIL, VIA_PHONE, PostLike
 from rest_framework.views import APIView
 from datetime import datetime
 from rest_framework.exceptions import ValidationError
@@ -16,6 +16,7 @@ from .models import CodeVerify,CustomUser
 from rest_framework.authtoken.models import Token
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
+from .permissions import IsAuthor
 
 
 
@@ -223,6 +224,178 @@ class ResetPasswordView(APIView):
             'message':"Siz muffaqiyatli parolizni tikladiz",
         }
         return Response(response)
+
+
+
+
+class PostCreateView(CreateAPIView):
+    permission_classes = (IsAuthenticated,)
+    queryset = Post.objects.all()
+    serializer_class = PostSerializers
+
+    def perform_create(self, serializer):
+        serializer.save(auth=self.request.user)
+
+
+class PostUpdateView(UpdateAPIView):
+    permission_classes = (IsAuthenticated,)
+    queryset = Post.objects.all()
+    serializer_class = PostSerializers
+
+    def update(self,request,*args,**kwargs):
+        instance=self.get_object()
+
+        if instance.auth != request.user:
+            raise ValidationError({"message":"Siz o'zingizni postingizni update qila olasiz"})
+
+        serializer=self.get_serializer(instance,data=request.data,partial=True)
+
+        serializer.is_valid(raise_exception=True)
+
+        self.perform_update(serializer)
+
+        response={
+            'status':status.HTTP_200_OK,
+            "message":'malumotlar yangilandi',
+            'data':serializer.validated_data
+        }
+
+        return Response(response)
+
+    def perform_update(self, serializer):
+        serializer.save()
+
+
+class PostListView(ListAPIView):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = PostSerializers
+
+    def get_queryset(self):
+        user=self.request.user
+        return Post.objects.filter(aauth=user).order_by('-created_at')
+
+    def list(self,request,*args,**kwargs):
+        queryset=self.get_queryset()
+        serializer=self.get_serializer(queryset,many=True)
+
+        response={
+            'status':status.HTTP_200_OK,
+            'message':'sizning postlaringiz',
+            'user':request.user.username,
+            'data':serializer.data
+        }
+        return Response(response)
+
+
+class PostDeleteView(DestroyAPIView):
+    permission_classes = (IsAuthenticated,IsAuthor)
+    queryset = Post.objects.all()
+    serializer_class = PostSerializers
+
+    def destroy(self,request,*args,**kwargs):
+        try:
+            instance=self.get_object()
+            self.perform_destroy(instance)
+            response={
+                'status':status.HTTP_400_BAD_REQUEST,
+                'message':'malumot topilmadi'
+            }
+        except Exception:
+            response={
+                'status':status.HTTP_400_BAD_REQUEST,
+                'message':'malumot topilmadi',
+            }
+        return Response(response)
+
+
+class PostDetailView(APIView):
+    permission_classes = (IsAuthenticated,AllowAny)
+    def get(self,request,pk):
+        post=get_object_or_404(Post,id=pk)
+
+        serializer=PostDetailSerializers(post,context={'request':request})
+
+        response={
+            'status':status.HTTP_200_OK,
+            'message':'malumotlar',
+            'data':serializer.data
+        }
+        return Response(response)
+
+    def post(self,request,pk):
+        user=self.request.user
+
+        if not user.is_authenticated:
+            raise ValidationError({'message':'siz royxatdan otmagansiz'})
+
+        postlike, Like=PostLike.objects.get_or_create(auth=user,post_id=pk)
+
+        if not Like:
+            postlike.delete()
+            return Response({'message':'like ochirildi'})
+
+        response={
+            'status':status.HTTP_201_CREATED,
+            'message':'like bosildi'
+        }
+        return Response(response)
+
+
+class CommentCreateView(APIView):
+    permission_classes = (IsAuthenticated,)
+    def post(self,request):
+        post_id=self.request.data.get('post_id')
+        text=self.request.data.get('text')
+        post=get_object_or_404(Post,id=post_id)
+        comment=Comment.objects.create(auth=self.request.user,post_id=post_id,text=text)
+
+        response={
+            "status":status.HTTP_201_CREATED,
+            'message':'comment qoshildi',
+            'comment':comment.id
+        }
+        return Response(response)
+
+
+
+class CommentUpdateView(APIView):
+    permission_classes = (IsAuthenticated,)
+    def post(self,request):
+        comment_id=self.request.data.get('comment_id')
+        new_text=self.request.data.get('text')
+        comment=Comment.objects.get(id=comment_id,auth=self.request.user)
+        comment.text=new_text
+        comment.save()
+        response={
+            'status':status.HTTP_200_OK,
+            'message':'comment yangilandi'
+        }
+        return Response(response)
+
+
+
+class CommentListView(ListAPIView):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = CommentSerializer
+
+    def get_queryset(self):
+        user=self.request.user
+        return Comment.objects.filter(auth=user)
+
+
+class CommentDeleteView(APIView):
+    permission_classes = (IsAuthenticated,IsAuthor)
+    def post(self,request):
+        user=self.request.user
+        comment_id=self.request.data.get('comment_id')
+        comment=get_object_or_404(Comment,id=comment_id,auth=user)
+        comment.delete()
+        response={
+            'status':status.HTTP_200_OK,
+            'message':'malumot ochirildi'
+        }
+        return Response(response)
+
 
 
 

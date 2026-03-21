@@ -2,7 +2,7 @@ from http.client import responses
 
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from .models import CustomUser, VIA_EMAIL, VIA_PHONE, CodeVerify,CODE_VERIFY,DONE,PHOTO_DONE
+from .models import CustomUser, VIA_EMAIL, VIA_PHONE, CodeVerify,CODE_VERIFY,DONE,PHOTO_DONE,Comment,Post,PostLike
 from shared.utility import check_email_or_phone,check_email_or_phone_or_username
 from rest_framework import status
 from django.db.models import Q
@@ -288,4 +288,38 @@ class ResetPasswordSerializers(serializers.Serializer):
 
 
 
+class PostSerializers(serializers.ModelSerializer):
+    created_at=serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S",read_only=True)
+
+    class Meta:
+        model=Post
+        fields=['id','text','image','video','created_at']
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    created_at=serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S",read_only=True)
+
+    class Meta:
+        model=Comment
+        fields=('id','post','text','created_at')
+
+
+class PostDetailSerializers(serializers.ModelSerializer):
+    created_at=serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S",read_only=True)
+    comments=CommentSerializer(many=True,read_only=True,source='comment_set')
+    likes_count=serializers.SerializerMethodField()
+    is_liked=serializers.SerializerMethodField()
+
+    class Meta:
+        model=Post
+        fields=('id','text','image','video','created_at','comments','likes_count','is_liked')
+
+        def get_likes_count(self,obj):
+            return obj.likes.count()
+
+        def get_is_likes(self,obj):
+            request=self.context.get('request')
+            if request.user.is_authenticated:
+                return obj.likes.filter(auth=request.user).exists()
+            return False
 

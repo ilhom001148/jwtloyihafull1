@@ -1,6 +1,9 @@
 from django.urls import path
 from .views import SignUpView, CodeVerifyView, GetNewCodeView, UserChangeInfoView, UserPhotoStatusView, LoginView, \
-    LogoutView, LoginRefreshView,ForgotPasswordView,ResetPasswordCodeView,ResetPasswordView
+    LogoutView, LoginRefreshView,ForgotPasswordView,ResetPasswordCodeView,ResetPasswordView,CommentCreateView,CommentUpdateView, \
+    CommentListView,CommentDeleteView,PostCreateView,PostListView,PostDetailView,PostDeleteView,PostUpdateView
+
+# from .views import *
 
 urlpatterns=[
     path('signup/',SignUpView.as_view()),
@@ -14,5 +17,17 @@ urlpatterns=[
     path('forgot-password/', ForgotPasswordView.as_view()),
     path('reset-code/', ResetPasswordCodeView.as_view()),
     path('reset-password/', ResetPasswordView.as_view()),
+
+    path('post-create/',PostCreateView.as_view()),
+    path('list-post/',PostListView.as_view()),
+    path('post-update/<int:pk>/',PostUpdateView.as_view()),
+    path('post-delete/<int:pk>/',PostDeleteView.as_view()),
+    path('post-detail/<int:pk>/', PostDetailView.as_view()),
+
+    path('comment-create/',CommentCreateView.as_view()),
+    path('comment-update/',CommentUpdateView.as_view()),
+    path('comment-list/',CommentListView.as_view()),
+    path('comment-delete/',CommentDeleteView.as_view()),
+
 
 ]
